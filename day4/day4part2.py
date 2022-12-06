@@ -11,7 +11,7 @@ for line in input_file:
     r2n2 = r2n2.rstrip()
     r2n2 = int(r2n2)
     
-    if ((r1n1 <= r2n1) and (r1n2 >= r2n2)) or ((r2n1 <= r1n1) and (r2n2 >= r1n2)):
+    if (r1n2 >= r2n1) or (r2n2 <= r1n1):
         sum += 1
         print(line.rstrip())
         
