@@ -1,4 +1,4 @@
-input_file = open('C:/Users/Us/source/repos/Advent Of Code 2022/day10/day10test.txt')
+input_file = open('day10test.txt', 'r')
 
 sum = 0
 x_register = 1
