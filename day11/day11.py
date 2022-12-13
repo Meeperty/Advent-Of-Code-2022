@@ -31,8 +31,15 @@ for line in input_file:
 for m in monkeys:
     print(m)
     
+#had to look up how to reduce worry levels :(
+divisors : list[int] = [m.divisor for m in monkeys]
+common_multiple = 1
+for divisor in divisors:
+    common_multiple *= divisor
+    
 current_round = 1
-while current_round <= 20:
+#edited for part 2
+while current_round <= 10000:
     current_monkey = 0
     for m in monkeys:
         print(f"Monkey {current_monkey}")
@@ -53,8 +60,8 @@ while current_round <= 20:
                     item = item * int(m.operator)
                 print(f"value is multipled by {m.operator} to {item}")
             #divide worry
-            item //= 3
-            print(f"value is divided by 3 to {item}")
+            #item //= 3 removed for part 2
+            #print(f"value is divided by 3 to {item}")
             #test item
             test = False
             if (item % m.divisor) == 0:
@@ -62,6 +69,8 @@ while current_round <= 20:
                 print(f"item is divisible by {m.divisor}")
             else:
                 print(f"item is not divisible by {m.divisor}")
+            #added for part 2
+            item = item % common_multiple
             #throw item
             throw_to = m.t_decision if test else m.f_decision
             monkeys[throw_to].items.append(item)
@@ -77,5 +86,10 @@ while current_round <= 20:
             i += 1
     
     current_round += 1
-
-print("\n")
+    print (f"round {current_round}")
+    
+inspected_counts = [m.inspected_count for m in monkeys]
+inspected_counts.sort()
+print(inspected_counts[2:])
+print(inspected_counts[len(inspected_counts) - 2] * inspected_counts[len(inspected_counts) - 1])
+print(f"used common multiple {common_multiple}")
