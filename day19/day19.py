@@ -1,5 +1,3 @@
-import collections
-import copy
 import time
 from queue import Queue
 
@@ -9,10 +7,6 @@ CLAY = 1
 OBSIDIAN = 2
 GEODE = 3
 
-class Robot:
-    def __init__(self, type : int) -> None:
-        self.type = type
-        
 class Blueprint:
     def __init__(self, o : int, c : int, oo : int, oc : int, gob : int, go : int) -> None:
         self.oreRobotCost = o
@@ -28,13 +22,13 @@ class Factory:
         self.type_building = NONE
 
 class State:
-    def __init__(self, fac : Factory, bp : Blueprint, robots : list[Robot], mats : list[int], min : int = 1) -> None:
+    def __init__(self, fac : Factory, bp : Blueprint, robots : list[int], mats : list[int], min : int = 1) -> None:
         self.factory = fac
         self.blueprint = bp
         self.robots = robots
         self.materials = mats
         self.minute = min
-        
+    
     def can_build(self, type : int) -> bool:
         if type == ORE:
             return self.materials[ORE] >= self.blueprint.oreRobotCost
@@ -48,7 +42,7 @@ class State:
 
     def gather_materials(self) -> None:
         for bot in self.robots:
-            self.materials[bot.type] += 1
+            self.materials[bot] += 1
     
     def options(self) -> list[int]:
         options = [NONE]
@@ -77,16 +71,15 @@ class State:
             self.materials[OBSIDIAN] -= self.blueprint.geodeRobotObsidianCost
         self.factory.type_building = type
         self.factory.is_building = True
-        
-    def end_build(self) -> Robot:
-        bot = Robot(self.factory.type_building)
+    
+    def end_build(self) -> int:
+        bot : int = self.factory.type_building
         self.factory.is_building = False
         self.factory.type_building = NONE
         return bot
 
 input_file = open("day19test.txt")
-
-blueprints : list[Blueprint] = []
+blueprints : list[Blueprint] = list()
 for line in input_file:
     sections = line.split()
     o = int(sections[6])
@@ -96,33 +89,36 @@ for line in input_file:
     go = int(sections[27])
     gob = int(sections[30])
     blueprints.append(Blueprint(o, c , oo, oc, go, gob))
-
-for blueprint in blueprints:
-    states : list[State] = []
-    final_states : list[State] = []
-    states.append(State(Factory(blueprint), blueprint, [Robot(ORE)], [0, 0, 0, 0]))
-    i = 0
-    start_time = time.time()
-    while len(states) > 0:
-        #order: start build, collect, end build
-        state = states.pop(0)
-        options = state.options()
+    
+def main():
+    for blueprint in blueprints:
+        states : list[State] = []
+        final_states : list[State] = []
+        factory = Factory(blueprint)
+        states.append(State(factory, blueprint, [ORE], [0, 0, 0, 0]))
+        i = 0
+        start_time = time.time()
+        while len(states) > 0:
+            #order: start build, collect, end build
+            state = states.pop(0)
+            options = state.options()
+            
+            for choice in options:
+                new_state = State(factory, blueprint, state.robots.copy(), state.materials.copy(), state.minute)
+                new_state.start_build(choice)
+                new_state.gather_materials()
+                if new_state.factory.is_building:
+                    new_state.robots.append(new_state.end_build())
+                new_state.minute += 1
+                if new_state.minute == 24:
+                    final_states.append(new_state)
+                else:
+                    states.append(new_state)
+                    if new_state.minute > i:
+                        print(f"now on minute {i}, last minute took {time.time() - start_time}s")
+                        start_time = time.time()
+                        i += 1
+                        
+        print("blueprint finished")
         
-        for choice in options:
-            state_copy = copy.deepcopy(state)
-            new_state = State(state_copy.factory, state_copy.blueprint, state_copy.robots, state_copy.materials, state_copy.minute)
-            new_state.start_build(choice)
-            new_state.gather_materials()
-            if new_state.factory.is_building:
-                new_state.robots.append(new_state.end_build())
-            new_state.minute += 1
-            if new_state.minute == 24:
-                final_states.append(new_state)
-            else:
-                states.append(new_state)
-                if new_state.minute > i:
-                    print(f"now on minute {i}, last minute took {time.time() - start_time}s")
-                    start_time = time.time()
-                    i += 1
-                    
-    print("blueprint finished")
+main()
