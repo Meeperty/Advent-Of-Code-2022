@@ -1,23 +1,33 @@
 #include <stdio.h>
+
+#include <list>
 #include <iostream>
 #include <vector>
 #include <fstream>
 #include <sstream>
+#include <string>
+#include <chrono>
+#include <algorithm>
 
-#define NONE -1
-#define ORE 0
-#define CLAY 1
-#define OBSIDIAN 2
-#define GEODE 3
+constexpr auto NONE = -1;
+constexpr auto ORE = 0;
+constexpr auto CLAY = 1;
+constexpr auto OBSIDIAN = 2;
+constexpr auto GEODE = 3;
+
+constexpr auto OREVALUE = 1;
+constexpr auto CLAYVALUE = 0.5;
+constexpr auto OBSIDIANVALUE = 16;
+constexpr auto GEODEVALUE = 100;
 
 typedef struct Blueprint
 {
-    char oreRobotCost;
-    char clayRobotCost;
-    char obsidianRobotOreCost;
-    char obsidianRobotClayCost;
-    char geodeRobotOreCost;
-    char geodeRobotObsidianCost;
+    short int oreRobotCost;
+    short int clayRobotCost;
+    short int obsidianRobotOreCost;
+    short int obsidianRobotClayCost;
+    short int geodeRobotOreCost;
+    short int geodeRobotObsidianCost;
 } Blueprint;
 
 typedef struct Robots
@@ -33,6 +43,21 @@ typedef struct Robots
         clayRobots = c;
         obsidianRobots = ob;
         geodeRobots = g;
+    }
+
+    std::string string()
+    {
+        std::string str("");
+        str.append("{ ");
+        str.append(std::to_string(oreRobots));
+        str.append(", ");
+        str.append(std::to_string(clayRobots));
+        str.append(", ");
+        str.append(std::to_string(obsidianRobots));
+        str.append(", ");
+        str.append(std::to_string(geodeRobots));
+        str.append(" }");
+        return str;
     }
 } Robots;
 
@@ -50,67 +75,87 @@ typedef struct Materials
         obsidian = ob;
         geodes = g;
     }
+
+    std::string string()
+    {
+        std::string str("");
+        str.append("{ ");
+        str.append(std::to_string(ore));
+        str.append(", ");
+        str.append(std::to_string(clay));
+        str.append(", ");
+        str.append(std::to_string(obsidian));
+        str.append(", ");
+        str.append(std::to_string(geodes));
+        str.append(" }");
+        return str;
+    }
 } Materials;
 
 class State
 {
     public:
-        char minute = 1;
-
-        bool isBuilding = false;
-        char typeBuilding = NONE;
-
-        Blueprint blueprint;
+        short int minute = 1;
+        
         Robots robots;
         Materials materials;
 
-        State(Blueprint& blueprint, 
+        State(
         Robots robots,
         Materials materials,
-        char min) : 
+        short int min) : 
         robots(1, 0, 0, 0),
         materials(0, 0, 0, 0)
         {
-            this->blueprint = blueprint;
             this->robots = robots;
             this->materials = materials;
             this->minute = min;
         }
 
-        bool CanBuildRobot(char type)
+        float EstimatedScore()
+        {
+            float estimate = 0;
+            estimate += ((robots.oreRobots * OREVALUE) + materials.ore) * OREVALUE;
+            estimate += ((robots.clayRobots * CLAYVALUE) + materials.clay) * CLAYVALUE / (minute / 10);
+            estimate += ((robots.obsidianRobots * OBSIDIANVALUE) + materials.obsidian) * OBSIDIANVALUE * (minute / 3);
+            estimate += ((robots.geodeRobots * GEODEVALUE) + materials.geodes) * GEODEVALUE * (minute / 2);
+            return estimate;
+        }
+
+        bool CanBuildRobot(const Blueprint &blueprint, short int type)
         {
             if (type == ORE)
-                return this->materials.ore >= this->blueprint.oreRobotCost;
+                return this->materials.ore >= blueprint.oreRobotCost;
             if (type == CLAY)
-                return this->materials.ore >= this->blueprint.clayRobotCost;
+                return this->materials.ore >= blueprint.clayRobotCost;
             if (type == OBSIDIAN)
-                return this->materials.ore >= this->blueprint.obsidianRobotOreCost &&
-                    this->materials.clay >= this->blueprint.obsidianRobotClayCost;
+                return this->materials.ore >= blueprint.obsidianRobotOreCost &&
+                    this->materials.clay >= blueprint.obsidianRobotClayCost;
             if (type == GEODE)
-                return this->materials.ore >= this->blueprint.geodeRobotOreCost &&
-                    this->materials.obsidian >= this->blueprint.geodeRobotObsidianCost;
+                return this->materials.ore >= blueprint.geodeRobotOreCost &&
+                    this->materials.obsidian >= blueprint.geodeRobotObsidianCost;
             return false;
         }
 
-        std::vector<char> Options()
+        std::vector<short int> Options(const Blueprint& blueprint)
         {
-            std::vector<char> opts;
+            std::vector<short int> opts;
             opts.push_back(NONE);
-            if (CanBuildRobot(ORE))
+            if (CanBuildRobot(blueprint, ORE))
                 opts.push_back(ORE);
-            if (CanBuildRobot(CLAY))
+            if (CanBuildRobot(blueprint, CLAY))
                 opts.push_back(CLAY);
-            if (CanBuildRobot(OBSIDIAN))
+            if (CanBuildRobot(blueprint, OBSIDIAN))
                 opts.push_back(OBSIDIAN);
-            if (CanBuildRobot(GEODE))
+            if (CanBuildRobot(blueprint, GEODE))
                 opts.push_back(GEODE);
             return opts;
         }
         
-        void StartBuild(char type)
+        bool StartBuild(const Blueprint &blueprint, short int type)
         {
             if (type == NONE)
-                return;
+                return false;
             if (type == ORE)
                 materials.ore -= blueprint.oreRobotCost;
             if (type == CLAY)
@@ -125,8 +170,7 @@ class State
                 materials.ore -= blueprint.geodeRobotOreCost;
                 materials.obsidian -= blueprint.geodeRobotObsidianCost;
             }
-            typeBuilding = type;
-            isBuilding = true;
+            return true;
         }
 
         void GatherResources()
@@ -137,7 +181,7 @@ class State
             materials.geodes += robots.geodeRobots;
         }
 
-        void EndBuild()
+        void EndBuild(short int typeBuilding)
         {
             switch (typeBuilding)
             {
@@ -157,8 +201,16 @@ class State
                     robots.geodeRobots++;
                     break;
             }
-            typeBuilding = NONE;
-            isBuilding = false;
+        }
+
+        std::string string()
+        {
+            std::string str = "";
+            str.append("Robots: ");
+            str.append(robots.string());
+            str.append(", Materials: ");
+            str.append(materials.string());
+            return str;
         }
 };
 
@@ -178,18 +230,34 @@ std::vector<std::string> split(const std::string &s, char delim) {
     return elems;
 }
 
-char strToCharNumber(std::string str) 
+short int strToInt(std::string str) 
 {
     std::stringstream ss;
     int c = 0;
     ss << str;
     ss >> c;
-    return (char)c;
+    return c;
+}
+
+std::string durationString(std::chrono::duration<long long, std::nano> dur)
+{
+    std::stringstream ss;
+    ss << dur.count() / (float)1000000000;
+    std::string s;
+    ss >> s;
+    return s;
+}
+
+bool GreaterScore(State state1, State state2)
+{
+    float score1 = state1.EstimatedScore();
+    float score2 = state2.EstimatedScore();
+    return score1 > score2;
 }
 
 int main() 
 {
-    std::ifstream input_file("day19.txt");
+    std::ifstream input_file("day19test.txt");
     std::vector<Blueprint> blueprints;
 
     while (input_file)
@@ -197,64 +265,91 @@ int main()
         std::string line;
         std::getline(input_file, line);
         std::vector<std::string> words = split(line, ' ');
-        char o;
-        char c;
-        char oo;
-        char oc;
-        char go;
-        char gob;
+        short int o;
+        short int c;
+        short int oo;
+        short int oc;
+        short int go;
+        short int gob;
 
         if (words.size())
         {
-            o = strToCharNumber(words[6]);
-            c = strToCharNumber(words[12]);
-            oo = strToCharNumber(words[18]);
-            oc = strToCharNumber(words[21]);
-            go = strToCharNumber(words[27]);
-            gob = strToCharNumber(words[30]);
+            o = strToInt(words[6]);
+            c = strToInt(words[12]);
+            oo = strToInt(words[18]);
+            oc = strToInt(words[21]);
+            go = strToInt(words[27]);
+            gob = strToInt(words[30]);
+
+            blueprints.push_back(Blueprint{ o, c, oo, oc, go, gob });
         }
-        blueprints.push_back(Blueprint{o, c, oo, oc, go, gob});
     }
     
     for (auto bp : blueprints)
     {
-        std::vector<State>* states = new std::vector<State>;//(1048576); //1048576 = 4^10
+        std::list<State>* states = new std::list<State>;//(1048576); //1048576 = 4^10
         std::vector<State>* finalStates = new std::vector<State>;//(1048576);
-        states->push_back(State(bp, Robots(1, 0, 0, 0), Materials{0, 0, 0, 0}, 1));
+        states->push_back(State(Robots(1, 0, 0, 0), Materials{0, 0, 0, 0}, 1));
 
+        int i = 0;
+        std::chrono::high_resolution_clock clock;
+        std::chrono::high_resolution_clock::time_point start = clock.now();
         while (states->size())
         {
-            State state = (*states)[states->size()];
-            std::vector<char> options = state.Options();
-            std::cout << "state at " << &state << " has " << state.materials.ore << " ore"<< std::endl;
+            State state = states->back(); //(*states)[states->size() - 1];
+            states->pop_back();
+            std::vector<short int> options = state.Options(bp);
 
             for (auto choice : options)
             {
                 State newState = state;
-                newState.StartBuild(choice);
+                bool isBuilding = newState.StartBuild(bp, choice);
                 newState.GatherResources();
-                if (newState.isBuilding)
-                    newState.EndBuild();
+                if (isBuilding)
+                    newState.EndBuild(choice);
                 newState.minute++;
                 //std::cout << newState.minute << std::endl;
                 if (newState.minute == 24)
+                {
+                    //std::cout << "finished state with mats " << newState.materials.string() << std::endl;
                     finalStates->push_back(newState);
+                }
                 else
-                    states->push_back(newState);
+                {
+                    if (newState.minute > i) 
+                    {
+                        std::cout << "now on minute " << newState.minute << ", last minute took " << durationString(clock.now() - start) << std::endl;
+                        start = clock.now();
+                        i++;
+/*                      if (i >= 10)
+                        {
+                            std::sort(states->begin(), states->end(), GreaterScore);
+                            std::cout << "sorted" << std::endl;
+                            std::list<State>::iterator halfway = states->begin();
+                            std::advance(halfway, states->size() * 2.0/3.0);
+                            states->erase(halfway, states->end());
+                            std::cout << "erased, new len is " << states->size() << std::endl;
+                        }*/
+                    }
+                    states->insert(states->begin(), newState);
+                }
             }
-            states->pop_back();
         }
 
-        int best = 0;
-        for (auto final : (*finalStates))
+        State* bestState = &(*finalStates)[0];
+        int best = bestState->materials.geodes;
+        for (auto candidate : (*finalStates))
         {
-            if (final.materials.geodes > best)
+            if (candidate.materials.geodes > best)
             {
-                best = final.materials.geodes;
+                best = candidate.materials.geodes;
+                bestState = &candidate;
             }
         }
         std::cout << "best geode score was " << best << std::endl;
+        std::cout << "winning state: " << bestState->string() << std::endl;
     }
 
+    std::cin.get();
     return 0;
 }
