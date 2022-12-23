@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include <list>
+#include <unordered_set>
 #include <iostream>
 #include <vector>
 #include <fstream>
@@ -212,6 +213,36 @@ class State
             str.append(materials.string());
             return str;
         }
+
+        bool operator==(const State& other) const {
+            return minute == other.minute &&
+                robots.oreRobots == other.robots.oreRobots &&
+                robots.clayRobots == other.robots.clayRobots &&
+                robots.obsidianRobots == other.robots.obsidianRobots &&
+                robots.geodeRobots == other.robots.geodeRobots &&
+                materials.ore == other.materials.ore &&
+                materials.clay == other.materials.clay &&
+                materials.obsidian == other.materials.obsidian &&
+                materials.geodes == other.materials.geodes;
+        }
+};
+
+struct hash_fn
+{
+    std::size_t operator() (const State& state) const
+    {
+        std::size_t m = std::hash<short int>()(state.minute);
+        std::size_t r1 = std::hash<int>()(state.robots.oreRobots);
+        std::size_t r2 = std::hash<int>()(state.robots.clayRobots);
+        std::size_t r3 = std::hash<int>()(state.robots.obsidianRobots);
+        std::size_t r4 = std::hash<int>()(state.robots.geodeRobots);
+        std::size_t m1 = std::hash<int>()(state.materials.ore);
+        std::size_t m2 = std::hash<int>()(state.materials.clay);
+        std::size_t m3 = std::hash<int>()(state.materials.obsidian);
+        std::size_t m4 = std::hash<int>()(state.materials.geodes);
+
+        return m ^ r1 << 1 ^ r2 << 2 ^ r3 << 3 ^ r4 << 4 ^ m1 << 5 ^ m2 << 6 ^ m3  << 7 ^ m4 << 8;
+    }
 };
 
 //these are copied from https://stackoverflow.com/questions/236129/how-do-i-iterate-over-the-words-of-a-string
@@ -255,7 +286,7 @@ bool GreaterScore(State state1, State state2)
     return score1 > score2;
 }
 
-int main() 
+int main()
 {
     std::ifstream input_file("day19test.txt");
     std::vector<Blueprint> blueprints;
@@ -284,20 +315,28 @@ int main()
             blueprints.push_back(Blueprint{ o, c, oo, oc, go, gob });
         }
     }
-    
+
     for (auto bp : blueprints)
     {
-        std::list<State>* states = new std::list<State>;//(1048576); //1048576 = 4^10
+        std::unordered_set<State, hash_fn>* states = new std::unordered_set<State, hash_fn>;//(1048576); //1048576 = 4^10
+        std::unordered_set<State, hash_fn>* newStates = new std::unordered_set<State, hash_fn>;//(1048576); //1048576 = 4^10
         std::vector<State>* finalStates = new std::vector<State>;//(1048576);
-        states->push_back(State(Robots(1, 0, 0, 0), Materials{0, 0, 0, 0}, 1));
+        states->emplace(Robots(1, 0, 0, 0), Materials{ 0, 0, 0, 0 }, 1);
 
         int i = 0;
         std::chrono::high_resolution_clock clock;
         std::chrono::high_resolution_clock::time_point start = clock.now();
-        while (states->size())
+        while (!states->empty() || !newStates->empty())
         {
-            State state = states->back(); //(*states)[states->size() - 1];
-            states->pop_back();
+            if (states->empty()) {
+                states = newStates;
+                newStates = new std::unordered_set<State, hash_fn>;
+                std::cout << "now on minute " << states->begin()->minute << ", last minute took " << durationString(clock.now() - start) << std::endl;
+                start = clock.now();
+            }
+
+            State state = *(states->begin());
+            states->erase(state);
             std::vector<short int> options = state.Options(bp);
 
             for (auto choice : options)
@@ -316,38 +355,38 @@ int main()
                 }
                 else
                 {
-                    if (newState.minute > i) 
-                    {
-                        std::cout << "now on minute " << newState.minute << ", last minute took " << durationString(clock.now() - start) << std::endl;
-                        start = clock.now();
-                        i++;
-/*                      if (i >= 10)
-                        {
-                            std::sort(states->begin(), states->end(), GreaterScore);
-                            std::cout << "sorted" << std::endl;
-                            std::list<State>::iterator halfway = states->begin();
-                            std::advance(halfway, states->size() * 2.0/3.0);
-                            states->erase(halfway, states->end());
-                            std::cout << "erased, new len is " << states->size() << std::endl;
-                        }*/
-                    }
-                    states->insert(states->begin(), newState);
+                    /*                  if (newState.minute > i)
+                                        {
+                                            std::cout << "now on minute " << newState.minute << ", last minute took " << durationString(clock.now() - start) << std::endl;
+                                            start = clock.now();
+                                            i++;
+                                            if (i >= 10)
+                                            {
+                                                std::sort(states->begin(), states->end(), GreaterScore);
+                                                std::cout << "sorted" << std::endl;
+                                                std::list<State>::iterator halfway = states->begin();
+                                                std::advance(halfway, states->size() * 2.0/3.0);
+                                                states->erase(halfway, states->end());
+                                                std::cout << "erased, new len is " << states->size() << std::endl;
+                                            }
+                                        }*/
+                    newStates->insert(newState);
                 }
             }
         }
 
-        State* bestState = &(*finalStates)[0];
-        int best = bestState->materials.geodes;
-        for (auto candidate : (*finalStates))
+        State bestState = (*finalStates)[0];
+        int best = bestState.materials.geodes;
+        for (const auto &candidate : (*finalStates))
         {
             if (candidate.materials.geodes > best)
             {
                 best = candidate.materials.geodes;
-                bestState = &candidate;
+                bestState = candidate;
             }
         }
         std::cout << "best geode score was " << best << std::endl;
-        std::cout << "winning state: " << bestState->string() << std::endl;
+        std::cout << "winning state: " << bestState.string() << std::endl;
     }
 
     std::cin.get();
