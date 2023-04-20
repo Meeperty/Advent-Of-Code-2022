@@ -30,7 +30,7 @@ assert(has_duplicate_characters("ajbj"))
 #assert(not has_duplicate_characters(str(['j', 'p', 'q', 'm'])))
 
 index = 0
-window = ['0', '0', '0', '0']
+window = ['0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0']
 for line in input_file:
     for char in line:
         if (not has_duplicate_characters(str_from_list(window)) and index > 3):
